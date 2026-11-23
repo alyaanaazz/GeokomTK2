@@ -1,15 +1,11 @@
 """
 CSCE604045 Geometri Komputasional - Tugas Pemrograman 2
 Algoritma Fortune (sweep line) untuk Diagram Voronoi
-+ clipping ke bounding box
-+ lingkaran kosong terbesar (pusat di dalam convex hull)
-+ input file & mouse (tkinter)
 
-Cara jalan:  python fortune_voronoi.py
-
-Konvensi koordinat: koordinat layar (y membesar ke bawah).
-Sweep line horizontal bergerak dari ATAS (y kecil) ke BAWAH (y besar).
-Beach line = batas bawah gabungan parabola; parabola terbuka ke atas layar.
+Anggota Kelompok:
+1. Alya Nabilla Khamil (2406358094)
+2. Nisrina Alya Nabilah (2406425924)
+3. Raida Khoyyara (2406495445)
 """
 
 import math
@@ -26,12 +22,7 @@ EPS = 1e-9
 BIG = 1e6                    # panjang "tak hingga" untuk edge tak terbatas
 
 
-# =====================================================================
-# 1. STRUKTUR DATA
-# =====================================================================
-
 class Site:
-    """Titik site (fokus parabola)."""
     __slots__ = ("x", "y")
 
     def __init__(self, x, y):
@@ -42,7 +33,6 @@ class Site:
 
 
 class Arc:
-    """Busur pada beach line (milik satu site). event = circle event yang akan menghapusnya."""
     __slots__ = ("site", "event")
 
     def __init__(self, site):
@@ -51,13 +41,6 @@ class Arc:
 
 
 class Edge:
-    """
-    Setengah edge Voronoi yang dijejak oleh sebuah breakpoint.
-    left, right : site pada sisi kiri / kanan breakpoint
-    start       : titik awal (selalu ada)
-    end         : titik akhir (None = edge menuju tak hingga)
-    Arah jejak breakpoint = vektor (right-left) diputar 90 derajat (koordinat layar).
-    """
     __slots__ = ("left", "right", "start", "end")
 
     def __init__(self, left, right, start):
@@ -71,7 +54,6 @@ class Edge:
 
 
 class Event:
-    """kind = 'site' atau 'circle'. Untuk circle: arc = busur yang hilang, triple = (a,b,c)."""
     __slots__ = ("y", "x", "kind", "site", "arc", "triple", "valid")
 
     def __init__(self, y, x, kind, site=None, arc=None, triple=None):
@@ -79,14 +61,8 @@ class Event:
         self.site, self.arc, self.triple = site, arc, triple
         self.valid = True
 
-
-# =====================================================================
-# 2. ALGORITMA FORTUNE
-# =====================================================================
-
 class FortuneVoronoi:
     def __init__(self, sites, bbox):
-        """sites: list Site ; bbox: (xmin, ymin, xmax, ymax)"""
         seen, uniq = set(), []
         for s in sites:                       # buang site duplikat
             key = (round(s.x, 9), round(s.y, 9))
@@ -103,13 +79,8 @@ class FortuneVoronoi:
         self._heap = []
         self._cnt = itertools.count()
 
-    # ---------- geometri ----------
     @staticmethod
     def _breakpoint(p, q, l):
-        """
-        x dari breakpoint antara busur p (kiri) dan q (kanan) untuk directrix y = l.
-        Parabola fokus p: y = ((x-px)^2 + py^2 - l^2) / (2 (py - l)).
-        """
         dp = 2.0 * (p.y - l)
         dq = 2.0 * (q.y - l)
         if abs(dp) < EPS:          # p tepat di sweep line -> parabola = garis vertikal
@@ -143,9 +114,7 @@ class FortuneVoronoi:
         uy = (a2 * (c.x - b.x) + b2 * (a.x - c.x) + c2 * (b.x - a.x)) / d
         return ux, uy
 
-    # ---------- circle event ----------
     def _check_circle(self, i):
-        """Cek apakah busur arcs[i] akan menghilang; jika ya, jadwalkan circle event."""
         if i <= 0 or i >= len(self.arcs) - 1:
             return
         arc = self.arcs[i]
@@ -171,7 +140,6 @@ class FortuneVoronoi:
         arc.event = ev
         heapq.heappush(self._heap, (ey, 0, cx, next(self._cnt), ev))
 
-    # ---------- site event ----------
     def _handle_site(self, site):
         y = site.y
         self.sweep_y = y
@@ -179,7 +147,6 @@ class FortuneVoronoi:
             self.arcs.append(Arc(site))
             return
 
-        # cari busur yang berada tepat di atas site baru
         i = 0
         while i < len(self.arcs) - 1 and \
                 site.x >= self._breakpoint(self.arcs[i].site, self.arcs[i + 1].site, y):
@@ -187,8 +154,6 @@ class FortuneVoronoi:
         arc = self.arcs[i]
 
         if abs(arc.site.y - y) < EPS:
-            # degenerate: y sama dengan site pada busur -> busur baru di kanan,
-            # edge-nya berupa garis vertikal yang datang dari tak hingga (atas)
             mx = (arc.site.x + site.x) / 2.0
             e = Edge(arc.site, site, (mx, y - BIG))
             self.edges.append(e)
@@ -198,7 +163,6 @@ class FortuneVoronoi:
             self._check_circle(i + 1)
             return
 
-        # kasus umum: pecah busur menjadi kiri - baru - kanan
         if arc.event is not None:
             arc.event.valid = False
             arc.event = None
@@ -216,7 +180,6 @@ class FortuneVoronoi:
         self._check_circle(i)        # left
         self._check_circle(i + 2)    # right
 
-    # ---------- circle event ----------
     def _handle_circle(self, ev):
         arc = ev.arc
         arc.event = None
@@ -237,10 +200,8 @@ class FortuneVoronoi:
         self.sweep_y = ev.y
         self.vertices.append((vx, vy, r, (a, b, c)))
 
-        # dua edge yang bertemu berakhir di vertex ini
         self.bps[i - 1].end = (vx, vy)
         self.bps[i].end = (vx, vy)
-        # edge baru antara a dan c mulai dari vertex
         e_new = Edge(a, c, (vx, vy))
         self.edges.append(e_new)
         self.bps[i - 1:i + 1] = [e_new]
@@ -249,7 +210,6 @@ class FortuneVoronoi:
         self._check_circle(i - 1)
         self._check_circle(i)
 
-    # ---------- sweep ----------
     def sweep(self):
         self.arcs, self.bps, self.edges, self.vertices = [], [], [], []
         self._heap = []
@@ -264,9 +224,7 @@ class FortuneVoronoi:
                 self._handle_circle(ev)
         return self.edges, self.vertices
 
-    # ---------- segmen mentah & clipping ----------
     def raw_segments(self):
-        """Semua edge Voronoi sebagai segmen (edge tak hingga dipanjangkan sejauh BIG)."""
         segs = []
         for e in self.edges:
             p0 = e.start
@@ -286,14 +244,7 @@ class FortuneVoronoi:
                 out.append(seg)
         return out
 
-    # ---------- lingkaran kosong terbesar ----------
     def largest_empty_circles(self):
-        """
-        Lingkaran kosong terbesar dengan pusat di dalam convex hull site.
-        Kandidat pusat: (1) vertex Voronoi di dalam hull,
-                        (2) titik potong edge Voronoi dengan sisi convex hull.
-        Jari-jari = jarak ke site terdekat.
-        """
         if len(self.sites) < 3:
             return []
         hull = convex_hull([(s.x, s.y) for s in self.sites])
@@ -316,13 +267,7 @@ class FortuneVoronoi:
                 res.append((r, cx, cy))
         return res
 
-
-# =====================================================================
-# 3. GEOMETRI PENDUKUNG
-# =====================================================================
-
 def _clip_segment(p0, p1, xmin, ymin, xmax, ymax):
-    """Liang-Barsky."""
     x0, y0 = p0
     x1, y1 = p1
     dx, dy = x1 - x0, y1 - y0
@@ -347,7 +292,6 @@ def _clip_segment(p0, p1, xmin, ymin, xmax, ymax):
 
 
 def convex_hull(points):
-    """Monotone chain. Mengembalikan list titik hull (tanpa duplikat)."""
     pts = sorted(set(points))
     if len(pts) <= 2:
         return pts
@@ -393,11 +337,6 @@ def _seg_intersect(p0, p1, q0, q1):
     if -1e-9 <= t <= 1 + 1e-9 and -1e-9 <= u <= 1 + 1e-9:
         return (p0[0] + t * rx, p0[1] + t * ry)
     return None
-
-
-# =====================================================================
-# 4. GUI
-# =====================================================================
 
 class VoronoiGUI:
     def __init__(self, root):
@@ -445,7 +384,7 @@ class VoronoiGUI:
         except Exception as e:
             messagebox.showerror("Error", str(e))
             return
-        self.sites = new_sites           # file MENGGANTI site yang ada
+        self.sites = new_sites
         self.redraw()
 
     def clear(self):
@@ -490,11 +429,6 @@ class VoronoiGUI:
                 cx - 3, cy - 3, cx + 3, cy + 3, fill="orange", outline=""))
         r, cx, cy = circles[0]
         self.status.config(text=f"Lingkaran terbesar: r={r:.2f}, pusat=({cx:.1f}, {cy:.1f})")
-
-
-# =====================================================================
-# 5. MAIN
-# =====================================================================
 
 if __name__ == "__main__":
     root = tk.Tk()
